@@ -98,6 +98,10 @@ npx expo install
 ## 2. 개발 서버 실행
 
 ```bash
+cd boss-app
+```
+
+```bash
 npx expo start
 ```
 
