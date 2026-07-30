@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import {
   Alert,
   Image,
@@ -14,6 +15,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import axios from "axios";
+import * as SecureStore from "expo-secure-store";
 
 import { styles } from "../styles/boardStyles";
 
@@ -45,6 +48,8 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   { id: 5, label: "위험행동" },
   { id: 6, label: "기타" },
 ];
+
+const API_BASE_URL = "http://172.16.0.75:8000";
 
 const RISK_OPTIONS: RiskOption[] = [
   { level: "high", label: "높음" },
@@ -147,38 +152,106 @@ export default function BoardScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!validateForm() || !riskLevel) {
+  if (!validateForm() || !riskLevel) {
+    return;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    const token =
+      (await SecureStore.getItemAsync("accessToken")) ||
+      (await SecureStore.getItemAsync("token"));
+
+    if (!token) {
+      Alert.alert(
+        "로그인 필요",
+        "로그인 정보가 없습니다. 다시 로그인해주세요."
+      );
       return;
     }
 
-    setIsSubmitting(true);
+    const formData = new FormData();
 
-    try {
-      await new Promise((resolve) =>
-        setTimeout(resolve, 500)
+    // 웹 createReport와 동일한 필드
+    formData.append("title", title.trim());
+    formData.append(
+      "board_contents",
+      description.trim()
+    );
+    formData.append("status", "등록");
+    formData.append("location", location.trim());
+    formData.append(
+      "event_category_id",
+      String(category.id)
+    );
+
+    if (photo) {
+      formData.append(
+        "image",
+        {
+          uri: photo.uri,
+          name: photo.fileName,
+          type: photo.mimeType,
+        } as any
+      );
+    }
+
+    const response = await axios.post(
+      `${API_BASE_URL}/api/boards`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    console.log("위험 신고 등록 결과:", response.data);
+
+    Alert.alert(
+      "신고 등록 완료",
+      "위험 신고가 정상적으로 접수되었습니다.",
+      [
+        {
+          text: "확인",
+          onPress: resetForm,
+        },
+      ]
+    );
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.log(
+        "위험 신고 등록 실패:",
+        error.response?.status,
+        error.response?.data
       );
 
-      Alert.alert(
-        "신고 등록 완료",
-        "위험 신고가 정상적으로 접수되었습니다.",
-        [
-          {
-            text: "확인",
-            onPress: resetForm,
-          },
-        ]
-      );
-    } catch (error) {
-      console.error(error);
+      const serverMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.error?.message;
 
       Alert.alert(
         "등록 실패",
-        "신고 등록 중 문제가 발생했습니다."
+        typeof serverMessage === "string"
+          ? serverMessage
+          : "신고 등록 중 문제가 발생했습니다."
       );
-    } finally {
-      setIsSubmitting(false);
+
+      return;
     }
-  };
+
+    console.log("위험 신고 등록 오류:", error);
+
+    Alert.alert(
+      "등록 실패",
+      "신고 등록 중 문제가 발생했습니다."
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const renderSelectOptions = () => {
     if (selectType === "category") {

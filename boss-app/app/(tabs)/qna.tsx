@@ -24,7 +24,7 @@ type Message = {
   time: string;
 };
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "http://172.20.10.3:8000";
 
 const DEFAULT_RECOMMENDED_QUESTIONS = [
   "소화기 점검 기준을 알려주세요.",

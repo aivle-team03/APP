@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -14,55 +15,113 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
 
-type FocusedInput = "email" | "password" | null;
+type FocusedInput = "userId" | "password" | null;
 
-// 임시 로그인 목업 계정
-const MOCK_USER = {
-  email: "admin@boss.com",
-  password: "1234",
-};
+/**
+ * 실행 환경에 맞게 주소 변경
+ *
+ * iOS 시뮬레이터:
+ * http://127.0.0.1:8000
+ *
+ * Android 에뮬레이터:
+ * http://10.0.2.2:8000
+ *
+ * 실제 휴대폰 Expo Go:
+ * http://노트북의_와이파이_IP:8000
+ * 예: http://192.168.0.15:8000
+ */
+const API_BASE_URL = "http://172.16.0.75:8000";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("admin@boss.com");
-  const [password, setPassword] = useState("1234");
+  const [userId, setUserId] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const [focusedInput, setFocusedInput] =
     useState<FocusedInput>(null);
 
   const passwordInputRef = useRef<TextInput>(null);
 
-  const handleLogin = () => {
-    const trimmedEmail = email.trim();
+  const handleLogin = async () => {
+    const trimmedUserId = userId.trim();
     const trimmedPassword = password.trim();
 
-    if (!trimmedEmail || !trimmedPassword) {
+    if (!trimmedUserId || !trimmedPassword) {
       Alert.alert(
         "입력 확인",
-        "이메일과 비밀번호를 모두 입력해주세요."
+        "아이디와 비밀번호를 모두 입력해주세요."
       );
       return;
     }
 
-    if (
-      trimmedEmail !== MOCK_USER.email ||
-      trimmedPassword !== MOCK_USER.password
-    ) {
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: trimmedUserId,
+            password: trimmedPassword,
+          }),
+        }
+      );
+
+      let data: {
+        access_token?: string;
+        detail?: string;
+      } = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("서버 응답을 해석할 수 없습니다.");
+      }
+
+      if (!response.ok) {
+        Alert.alert(
+          "로그인 실패",
+          data.detail ||
+            "아이디 또는 비밀번호가 일치하지 않습니다."
+        );
+        return;
+      }
+
+      if (!data.access_token) {
+        Alert.alert(
+          "로그인 실패",
+          "서버 응답에 인증 토큰이 없습니다."
+        );
+        return;
+      }
+
+      await SecureStore.setItemAsync(
+        "accessToken",
+        data.access_token
+      );
+
+      await SecureStore.setItemAsync(
+        "isLoggedIn",
+        "true"
+      );
+
+      router.replace("/(tabs)/checklist");
+    } catch (error) {
+      console.error("로그인 요청 오류:", error);
+
       Alert.alert(
-        "로그인 실패",
-        "이메일 또는 비밀번호가 일치하지 않습니다."
+        "서버 연결 실패",
+        "백엔드 서버와 통신할 수 없습니다.\n서버 주소와 실행 상태를 확인해주세요."
       );
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    Alert.alert("로그인 성공", "BOSS에 오신 것을 환영합니다.", [
-      {
-        text: "확인",
-        onPress: () => {
-          router.replace("/(tabs)/checklist");
-        },
-      },
-    ]);
   };
 
   return (
@@ -104,7 +163,9 @@ export default function LoginScreen() {
                   BOSS SAFETY MANAGEMENT
                 </Text>
 
-                <Text style={styles.cardTitle}>로그인</Text>
+                <Text style={styles.cardTitle}>
+                  로그인
+                </Text>
 
                 <Text style={styles.cardDescription}>
                   관리자 계정으로 로그인해주세요.
@@ -113,20 +174,22 @@ export default function LoginScreen() {
 
               <View style={styles.form}>
                 <View>
-                  <Text style={styles.label}>이메일</Text>
+                  <Text style={styles.label}>
+                    아이디
+                  </Text>
 
                   <View
                     style={[
                       styles.inputContainer,
-                      focusedInput === "email" &&
+                      focusedInput === "userId" &&
                         styles.inputContainerFocused,
                     ]}
                   >
                     <Ionicons
-                      name="mail-outline"
+                      name="person-outline"
                       size={20}
                       color={
-                        focusedInput === "email"
+                        focusedInput === "userId"
                           ? colors.primary
                           : "#8194AD"
                       }
@@ -134,18 +197,22 @@ export default function LoginScreen() {
 
                     <TextInput
                       style={styles.input}
-                      value={email}
-                      onChangeText={setEmail}
-                      placeholder="이메일을 입력해주세요"
+                      value={userId}
+                      onChangeText={setUserId}
+                      placeholder="아이디를 입력해주세요"
                       placeholderTextColor="#9AAAC0"
-                      keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
-                      autoComplete="email"
-                      textContentType="emailAddress"
+                      autoComplete="username"
+                      textContentType="username"
                       returnKeyType="next"
-                      onFocus={() => setFocusedInput("email")}
-                      onBlur={() => setFocusedInput(null)}
+                      editable={!isLoading}
+                      onFocus={() =>
+                        setFocusedInput("userId")
+                      }
+                      onBlur={() =>
+                        setFocusedInput(null)
+                      }
                       onSubmitEditing={() => {
                         passwordInputRef.current?.focus();
                       }}
@@ -155,7 +222,9 @@ export default function LoginScreen() {
                 </View>
 
                 <View>
-                  <Text style={styles.label}>비밀번호</Text>
+                  <Text style={styles.label}>
+                    비밀번호
+                  </Text>
 
                   <View
                     style={[
@@ -187,10 +256,13 @@ export default function LoginScreen() {
                       autoComplete="password"
                       textContentType="password"
                       returnKeyType="done"
+                      editable={!isLoading}
                       onFocus={() =>
                         setFocusedInput("password")
                       }
-                      onBlur={() => setFocusedInput(null)}
+                      onBlur={() =>
+                        setFocusedInput(null)
+                      }
                       onSubmitEditing={handleLogin}
                     />
                   </View>
@@ -199,31 +271,53 @@ export default function LoginScreen() {
                 <Pressable
                   style={({ pressed }) => [
                     styles.loginButton,
-                    pressed && styles.loginButtonPressed,
+                    pressed &&
+                      !isLoading &&
+                      styles.loginButtonPressed,
+                    isLoading &&
+                      styles.loginButtonDisabled,
                   ]}
                   onPress={handleLogin}
+                  disabled={isLoading}
                 >
-                  <Text style={styles.loginButtonText}>
-                    로그인
-                  </Text>
+                  {isLoading ? (
+                    <>
+                      <ActivityIndicator
+                        size="small"
+                        color="#FFFFFF"
+                      />
 
-                  <Ionicons
-                    name="arrow-forward"
-                    size={19}
-                    color="#FFFFFF"
-                  />
+                      <Text style={styles.loginButtonText}>
+                        로그인 중...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.loginButtonText}>
+                        로그인
+                      </Text>
+
+                      <Ionicons
+                        name="arrow-forward"
+                        size={19}
+                        color="#FFFFFF"
+                      />
+                    </>
+                  )}
                 </Pressable>
 
                 <View style={styles.findButtonContainer}>
                   <Pressable
                     style={({ pressed }) => [
                       styles.findButton,
-                      pressed && styles.findButtonPressed,
+                      pressed &&
+                        styles.findButtonPressed,
                     ]}
+                    disabled={isLoading}
                     onPress={() => {
                       Alert.alert(
                         "아이디 찾기",
-                        "아이디 찾기 기능은 추후 연결될 예정입니다."
+                        "아이디 찾기 화면을 연결해주세요."
                       );
                     }}
                   >
@@ -237,12 +331,14 @@ export default function LoginScreen() {
                   <Pressable
                     style={({ pressed }) => [
                       styles.findButton,
-                      pressed && styles.findButtonPressed,
+                      pressed &&
+                        styles.findButtonPressed,
                     ]}
+                    disabled={isLoading}
                     onPress={() => {
                       Alert.alert(
                         "비밀번호 찾기",
-                        "비밀번호 찾기 기능은 추후 연결될 예정입니다."
+                        "비밀번호 재설정 화면을 연결해주세요."
                       );
                     }}
                   >
@@ -356,7 +452,6 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     borderWidth: 1,
     borderColor: "#E5EDF7",
-
     shadowColor: "#54749C",
     shadowOffset: {
       width: 0,
@@ -416,7 +511,6 @@ const styles = StyleSheet.create({
   inputContainerFocused: {
     borderColor: colors.primary,
     backgroundColor: colors.white,
-
     shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
@@ -444,7 +538,6 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: colors.primary,
     marginTop: 4,
-
     shadowColor: colors.primaryDark,
     shadowOffset: {
       width: 0,
@@ -458,6 +551,10 @@ const styles = StyleSheet.create({
   loginButtonPressed: {
     opacity: 0.85,
     transform: [{ scale: 0.99 }],
+  },
+
+  loginButtonDisabled: {
+    opacity: 0.65,
   },
 
   loginButtonText: {
