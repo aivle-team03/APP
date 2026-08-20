@@ -49,7 +49,7 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   { id: 6, label: "기타" },
 ];
 
-const API_BASE_URL = "http://172.16.0.75:8000";
+const API_BASE_URL = "http://172.20.10.3:8000";
 
 const RISK_OPTIONS: RiskOption[] = [
   { level: "high", label: "높음" },

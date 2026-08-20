@@ -32,7 +32,7 @@ type FocusedInput = "userId" | "password" | null;
  * http://노트북의_와이파이_IP:8000
  * 예: http://192.168.0.15:8000
  */
-const API_BASE_URL = "http://172.16.0.75:8000";
+const API_BASE_URL = "http://172.20.10.3:8000";
 
 export default function LoginScreen() {
   const [userId, setUserId] = useState("");
