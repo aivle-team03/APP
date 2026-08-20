@@ -17,7 +17,7 @@ import {
 
 import { styles } from "../styles/educationStyles";
 
-const API_BASE_URL = "http://172.16.0.75:8000";
+const API_BASE_URL = "http://172.20.10.3:8000";
 
 type EducationStatus =
   | "미이수"

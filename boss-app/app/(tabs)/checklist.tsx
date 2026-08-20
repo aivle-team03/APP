@@ -73,7 +73,7 @@ type ChecklistTask = InspectionTask | ActionTask;
  * 실제 휴대폰:
  * http://맥북IP주소:8000
  */
-const API_BASE_URL = "http://172.16.0.75:8000";
+const API_BASE_URL = "http://172.20.10.3:8000";
 
 function createKey(prefix: string, id: string | number) {
   return `${prefix}-${id}`;
